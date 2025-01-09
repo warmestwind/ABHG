@@ -1,4 +1,4 @@
-from .UNet_S import Unet
+from model.UNet_S import Unet
 
 import torch
 import torch.nn as nn
@@ -168,8 +168,7 @@ class Coord_fine(nn.Module):
 
 class UNET_ABHG(nn.Module):
     def __init__(self, config):
-        super().__init__(config)
-
+        super().__init__()
 
         self.s1 = Unet(config)
         self.s2 = Coord_fine(h_dim=33 + num_pt * 9 * 2 + 2, steps=1)
@@ -229,23 +228,22 @@ class UNET_ABHG(nn.Module):
         local_results_t = []
         # here are some differences from the training phase
         for i in range(2):  # mc drop time
-            outputs_series, coords = self.s2(frame_feats.view(-1, 33, 256, 256), global_heatmap,
-                                                    global_coordinate)
+            outputs_series, coords = self.s2(frame_feats.view(-1, 33, 256, 256), global_coordinate)
             local_results_t.append(outputs_series.view(-1, 1, num_pt, 2))
 
         var = torch.var(torch.stack(local_results_t), 0).sum((2, 3))
         coords_series = torch.stack(local_results_t).mean(0)
-        coords_series = coords_series.view(-1, 8, 1, 1)
+        coords_series = coords_series.view(-1, 2*num_pt, 1, 1)
 
 
 
-        return global_coordinate*255, coords_series.view(1, -1, 4, 2), var
+        return global_coordinate*255, coords_series.view(1, -1, num_pt, 2), var
 
 
 if __name__ == '__main__':
     from config import get_config
 
     model = UNET_ABHG(get_config()).cuda()
-    frame = torch.ones((1, 1, 256, 256), dtype=torch.float).cuda() 
+    frame = torch.ones((1, 1, 256, 256), dtype=torch.float).cuda()
 
-    model(frame)
+    model.forward_test(frame)
